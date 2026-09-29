@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "deny": [
+      "Edit(//mnt/hdd3/sqm_noninduced/**)",
+      "Write(//mnt/hdd3/sqm_noninduced/**)"
+    ]
+  }
+}
