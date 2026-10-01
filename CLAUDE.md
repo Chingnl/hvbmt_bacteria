@@ -1,7 +1,13 @@
 # HVBMT bacterial metatranscriptome project
 
+## Workflow history
+- Completed work and history are in WORKFLOW.md; read it only when you need context on past tasks.
+- Before ending a session, update Current state and append a Task log entry to WORKFLOW.md.
+
 ## Data (READ-ONLY — never modify, move, or delete anything here)
 - SqueezeMeta output: /mnt/hdd3/sqm_noninduced/  (653 GB; mostly intermediate files)
+- RDS object of '/mnt/hdd3/sqm_noninduced/' is this file: /mnt/hdd3/sqm_data_cache.rds. It is the full `loadSQM()` object (class SQM, ~4.8 GB RAM). Load it with `readRDS()`; never re-run `loadSQM()`.
+- Host pre-filtering: KneadData filtered the quality-controlled reads against the *Hydra vulgaris* strain 105 genome (bowtie2 index ~/db/kneaddata/hvul105-bt2-db/) before SqueezeMeta. Host reads still remain (~40–53% Eukaryota), so filter host from the SqueezeMeta output as well (see meta/DATA_NOTES.md).
 - Use summary tables in results/ and results/tables/ for analysis
 - Metadata: ~/HVBMT_project/meta/HVBMT_metadata_noninduced.csv
 

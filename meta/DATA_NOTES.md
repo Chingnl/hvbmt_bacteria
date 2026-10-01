@@ -1,10 +1,12 @@
 # DATA_NOTES — SqueezeMeta output, noninduced HVBMT samples
 
-Survey date: 2026-09-29. Source: `/mnt/hdd3/sqm_noninduced/`. **This directory is read-only**; it was inspected only with `du`, `ls`, `head` and header comparisons.
+Survey date: 2026-09-29 (updated 2026-09-30). Source: `/mnt/hdd3/sqm_noninduced/`. **This directory is read-only**; it was inspected only with `du`, `ls`, `head` and header comparisons.
 
 ## TL;DR
 - All 30 sample IDs in the SqueezeMeta tables match `meta/HVBMT_metadata_noninduced.csv` exactly, **in the same order**. No renaming is needed.
-- **The data is mostly host.** In every sample, *Hydra vulgaris* is the most abundant taxon at every rank. Only **1.4–9.4 % of reads are Bacteria**.
+- **Reads were host-filtered before SqueezeMeta.** KneadData filtered the quality-controlled reads against the *Hydra vulgaris* strain 105 genome (bowtie2 index `~/db/kneaddata/hvul105-bt2-db/`). This did not remove all host reads (next point).
+- **The full SQM object is cached** at `/mnt/hdd3/sqm_data_cache.rds`. `readRDS()` gives the complete `loadSQM()` object and peaks at about 4.8 GB of RAM, so `loadSQM()` never needs to run again.
+- **The data is still mostly host.** In every sample, *Hydra vulgaris* is the most abundant taxon at every rank. Only **1.4–9.4 % of reads are Bacteria**.
 - The KO / COG / PFAM tables in `results/tables/` **include host ORFs**, so bacterial functional analysis must first subset to Bacteria (see [Host dominance](#host-dominance--the-main-caveat)).
 - For analysis, use the files in `results/tables/` (≤ 9 MB each, apart from the per-ORF and per-contig taxonomy files). Do not load `data/`, `intermediate/` or `temp/`.
 
@@ -63,42 +65,11 @@ Each table has one row per feature and one column per sample (30 samples). The f
 
 **Other.** `bin.tax.tsv`, `orf.16S.tsv`, `RecA.tsv` and `orf.marker.genes.tsv` (30 MB).
 
-### First lines of the key tables (columns truncated)
-`phylum.prokfilter.abund.tsv`
-```
-                                        HVBMT01 HVBMT21 HVBMT41 HVBMT04 HVBMT24 HVBMT44 ...
-k_Archaea;p_Candidatus Thermoplasmatota     210     244     344     383     267     318 ...
-k_Archaea;p_Candidatus Thorarchaeota          0       0       0       2       0       0 ...
-k_Archaea;p_Candidatus Woesearchaeota         0       0       0       0       0       0 ...
-```
-`genus.prokfilter.abund.tsv`
-```
-k_Archaea;p_Candidatus Thermoplasmatota;c_Candidatus Poseidoniia;...;g_Unclassified Candidatus Poseidoniia  204 244 344 371 ...
-k_Archaea;p_Candidatus Thermoplasmatota;c_Unclassified ...;g_Unclassified Candidatus Thermoplasmatota       6   0   0  12 ...
-```
-`KO.abund.tsv` (raw counts) and `KO.tpm.tsv`
-```
-        HVBMT01 HVBMT21 HVBMT41 HVBMT04 ...          HVBMT01  HVBMT21  HVBMT41 ...
-K00001      358     505     877     269 ...   K00001  3.659    5.587    8.807  ...
-K00002     1492    1220     907    1517 ...   K00002 27.225   26.328   19.188  ...
-K00003      112     107     172      72 ...   K00003  1.315    1.568    2.028  ...
-```
-`KO.names.tsv`
-```
-        Name                                        Path
-K00001  alcohol dehydrogenase [EC:1.1.1.1]          Metabolism; Carbohydrate metabolism; Glycolysis / Gluconeogenesis | ...
-K00002  alcohol dehydrogenase (NADP+) [EC:1.1.1.2]  Metabolism; Carbohydrate metabolism; Glycolysis / Gluconeogenesis | ...
-```
-`COG.abund.tsv`
-```
-COG0001   441   515   758   300 ...
-COG0002   152   205   334   102 ...
-```
-`PFAM.abund.tsv`: note that the top rows are eukaryotic GPCR domains, i.e. host.
-```
-PF00001 [7 transmembrane receptor (rhodopsin family)]    8221   6948   6443 ...
-PF00002 [7 transmembrane receptor (Secretin family)]    12934  10922   9860 ...
-```
+### Table format summary (from `head`)
+- Taxonomy tables: row name = lineage string (`k_Archaea;p_Candidatus Thermoplasmatota;...`), then 30 integer count columns. The prokfilter tables list Archaea first.
+- `KO/COG.abund.tsv` have integer counts and `*.tpm.tsv` have decimals; row IDs are e.g. `K00001` and `COG0001`.
+- `KO.names.tsv` maps an ID to `Name` (e.g. `alcohol dehydrogenase [EC:1.1.1.1]`) and `Path` (e.g. `Metabolism; Carbohydrate metabolism; Glycolysis / Gluconeogenesis | ...`).
+- `PFAM.abund.tsv`: the top rows are eukaryotic GPCR domains (PF00001/PF00002, about 7–13 k reads per sample), i.e. host.
 
 ## Sample-name check against metadata: PASS
 - The metadata file `meta/HVBMT_metadata_noninduced.csv` has 30 rows plus a header. Columns are `SampleID, Replicate, Temp, Time, Treatment, GroupCombined, sample`. There are no duplicate IDs and no CRLF line endings.
@@ -114,6 +85,21 @@ PF00002 [7 transmembrane receptor (Secretin family)]    12934  10922   9860 ...
 - Depth varies about 2-fold between samples, so counts must be normalized before any comparison.
 
 ## Host dominance — the main caveat
+**Upstream host filtering.** Before SqueezeMeta, KneadData filtered the quality-controlled reads against the *Hydra vulgaris* strain 105 T2T genome. It used the bowtie2 index at `~/db/kneaddata/hvul105-bt2-db/` (`HydraT2T_105_genomic.fna`, 17 sequences, 845 MB). The fractions below are what remained *after* that filter, so the pre-filter removed only part of the host signal.
+- Possible reasons (not verified): bowtie2 is not splice-aware, so RNA reads that span exon junctions do not align end-to-end to the genome. Other transcripts may come from host regions missing from or divergent in the strain 105 assembly.
+- Consequence: re-mapping reads to the same index would mostly repeat work. The SqueezeMeta output still has to be host-filtered.
+
+**Contig-level taxonomy** (`19.contigtable`, `Tax` column, superkingdom):
+
+| Superkingdom | Contigs | Mb | Mean GC % |
+|---|---|---|---|
+| Bacteria | 91,741 | 68.3 | 53.3 |
+| Eukaryota | 244,951 | 205.7 | 33.1 |
+| Unclassified | 807,585 | 549.6 | 31.1 |
+| Viruses / Archaea | 1,433 / 139 | 0.9 / 0.1 | 32 |
+
+The GC of the unclassified contigs matches the Eukaryota contigs, which suggests they are mostly host. About 17 k Bacteria contigs have GC of 20–39 %, overlapping the host range, so they are the main candidates for mislabelled host.
+
 Per-sample read fractions, from `superkingdom.nofilter.abund.tsv`:
 
 | Sample | Temp/Day | Bacteria % | Eukaryota % | Unclassified % | Unmapped % |
@@ -154,7 +140,7 @@ Archaea and Viruses each make up less than 0.2 %. The "No CDS" category is omitt
 **What this means for analysis**
 1. According to `21.stats`, the most abundant taxon in every sample is *Hydra vulgaris* (Cnidaria) at every rank. The Unclassified fraction (40–57 %) is probably mostly host as well, e.g. poorly annotated Hydra transcripts.
 2. The **function tables (`KO/COG/PFAM.*.tsv`) are community-wide and include host ORFs.** This is evident from the GPCR domains at the top of the PFAM table. They **cannot be used as-is** for any of the bacterial questions (objectives 1–5).
-3. Recommended route: in R, `SQMtools::loadSQM("/mnt/hdd3/sqm_noninduced")`, then `subsetTax(SQM, "superkingdom", "Bacteria")`, and use the functional tables of that bacterial subset. `loadSQM()` reads the 738 MB orftable and 703 MB contigtable, so check memory first. Loading once and saving the bacterial subset to an `.rds` is worthwhile. `loadSQMlite()` on `results/tables/` **cannot** do this subsetting, because it has no per-ORF taxonomy.
+3. Recommended route: in R, `SQM <- readRDS("/mnt/hdd3/sqm_data_cache.rds")`, then `subsetTax(SQM, "superkingdom", "Bacteria")`, and use the functional tables of that bacterial subset. The cache is the full `loadSQM()` object (class `SQM`, with `orfs`, `contigs`, `bins`, `taxa` and `functions`) and needs about 4.8 GB of RAM. `loadSQMlite()` on `results/tables/` **cannot** do this subsetting, because it has no per-ORF taxonomy.
 4. The bacterial fraction varies about 7-fold, from 1.4 % in HVBMT38 to 9.4 % in HVBMT52. Bacterial functional profiles must therefore be normalized within the bacterial subset, e.g. TPM or relative abundance recomputed after subsetting, or per-taxon normalization. They should not be normalized to total reads.
 5. The lowest bacterial fractions are in **8 °C Day 28 (1.4–2.0 %)**. This could itself be a biological signal (objective 1C), but it also means those samples have the fewest bacterial reads and therefore the noisiest bacterial profiles.
 6. The `prokfilter` taxonomy tables are the relevant ones for community composition. Even so, the first rows of the phylum and genus tables are Archaea, so filter explicitly to `k_Bacteria` if the focus is bacteria only.
